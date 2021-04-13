@@ -9,12 +9,9 @@ from torch.utils.data.sampler import SubsetRandomSampler
 
 
 def get_train_valid_loader(batch_size,
-                           augment,
-                           random_seed,
-                           valid_size=0.1,
                            shuffle=True,
                            num_workers=4,
-                           pin_memory=False):
+                           pin_memory=True):
     """
     Utility function for loading and returning train and valid
     multi-process iterators over the SVHN dataset. 
@@ -35,9 +32,7 @@ def get_train_valid_loader(batch_size,
     - train_loader: training set iterator.
     - valid_loader: validation set iterator.
     """
-    error_msg = "[!] valid_size should be in the range [0, 1]."
-    assert ((valid_size >= 0) and (valid_size <= 1)), error_msg
-
+    
     normalize = transforms.Normalize(
         mean=[0.4914, 0.4822, 0.4465],
         std=[0.2023, 0.1994, 0.2010],
