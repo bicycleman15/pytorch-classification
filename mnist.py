@@ -26,7 +26,7 @@ import pandas as pd
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 
-from solver.loss import CCETrainLoss_alpha, MDCATrainLoss_alpha, MDCA_LabelSmoothLoss, DCATrainLoss_alpha, MDCA_NLLLoss
+from solver.loss import CCETrainLoss_alpha, MDCATrainLoss_alpha, MDCA_LabelSmoothLoss, DCATrainLoss_alpha, MDCA_NLLLoss, FocalLoss, FocalMDCA_NLLLoss, FocalMDCA_LS
 from utils import Bar, Logger, AverageMeter, accuracy, mkdir_p, savefig
 from resnet import cifar_resnet56
 from cifarc_dataloader import CIFAR100_C
@@ -45,7 +45,7 @@ model_names = sorted(name for name in models.__dict__
 
 parser = argparse.ArgumentParser(description='PyTorch CIFAR10/100 Training')
 # Datasets
-parser.add_argument('-d', '--dataset', default='cifar10', type=str)
+parser.add_argument('-d', '--dataset', default='cifar100', type=str)
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
 # Optimization options
@@ -120,20 +120,29 @@ best_acc = 0  # best test accuracy
 def main():
     global best_acc
     start_epoch = args.start_epoch  # start from epoch 0 or last checkpoint epoch
-    # loss_name = "LS+MDCA"
+    loss_name = "LS+MDCA"
+    # loss_name = "NLL+CCE"
+    # loss_name = "NLL+FMDCA"
+    # loss_name = "LS+FMDCA"
     # loss_name = "LS"
     # loss_name = "NLL+DCA"
     # loss_name = "NLL+MDCA"
-    loss_name = "NLL"
+    # loss_name = "FL"
+    # loss_name = "NLL"
     # alpha = args.alpha
     alpha = 0.1
-    beta = 4.0
-    # prefix = "6-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_alpha={alpha}_lr={args.lr}"
+    beta = 50
+    # gamma = 1.0
+    # prefix = "10-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_lr={args.lr}"
     # prefix = "random_test"
-    # prefix = "7-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_alpha={alpha}_beta={beta}_lr={args.lr}"
-    # prefix = "9-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_beta={beta}_lr={args.lr}"
-    prefix = "9-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_lr={args.lr}"
-    # prefix = f"{args.dataset}_{args.arch}_depth={args.depth}_{loss_name}_{alpha}_lr={args.lr}"
+    # prefix = "11-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_alpha={args.alpha}_lr={args.lr}"
+    # prefix = "11-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_beta={beta}_lr={args.lr}"
+    # prefix = "10-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_gamma={gamma}_beta={beta}_lr={args.lr}"
+    prefix = "10-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_beta={beta}_alpha={alpha}_lr={args.lr}"
+    # prefix = "10-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_alpha={alpha}_beta={beta}_lr={args.lr}"
+    # prefix = "10-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_gamma={gamma}_lr={args.lr}"
+    # prefix = "9-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_lr={args.lr}"
+    # prefix = "10-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_beta={beta}_lr={args.lr}"
     title = prefix
     # writer = SummaryWriter(log_dir= f"acmmm_tensorboard/{prefix}")
 
@@ -155,8 +164,8 @@ def main():
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
     
-    dataloader = datasets.CIFAR10
-    num_classes = 10
+    dataloader = datasets.CIFAR100
+    num_classes = 100
     classes = ["airplanes", "cars", "birds", "cats", "deer", "dogs", "frogs", "horses", "ships", "trucks"]
 
     ece_evaluator = ECELoss(n_classes = num_classes)
@@ -185,10 +194,13 @@ def main():
 
     # criterion = MDCATrainLoss_alpha(alpha)
     # criterion = CCETrainLoss_alpha(n_classes = num_classes, alpha=args.alpha)
-    criterion = DCATrainLoss_alpha(beta = 0.0)
+    criterion = DCATrainLoss_alpha(beta=beta)
     # criterion = MDCA_NLLLoss(n_classes=num_classes, beta=beta)
-    # criterion = MDCA_LabelSmoothLoss(n_classes = num_classes, alpha=alpha, beta = beta)
+    # criterion = MDCA_LabelSmoothLoss(n_classes = num_classes, alpha=alpha, beta=beta)
+    # criterion = FocalMDCA_NLLLoss(gamma=gamma, beta=beta)
+    # criterion = FocalMDCA_LS(num_classes, alpha=alpha, beta=beta, gamma=gamma)
     # criterion = nn.CrossEntropyLoss() 
+    # criterion = FocalLoss(gamma=gamma) 
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
     if args.resume:
@@ -245,8 +257,8 @@ def main():
     print(best_acc)
 
     # run t-sne last
-    tsne(testloader, model, criterion, start_epoch, use_cuda, ece_evaluator, fastcce_evaluator, classes, prefix)
-    do_umap(testloader, model, criterion, start_epoch, use_cuda, ece_evaluator, fastcce_evaluator, classes, prefix)
+    # tsne(testloader, model, criterion, start_epoch, use_cuda, ece_evaluator, fastcce_evaluator, classes, prefix)
+    # do_umap(testloader, model, criterion, start_epoch, use_cuda, ece_evaluator, fastcce_evaluator, classes, prefix)
 
 def train(trainloader, model, criterion, optimizer, epoch, use_cuda):
     # switch to train mode

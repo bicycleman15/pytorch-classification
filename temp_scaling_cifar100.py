@@ -45,7 +45,7 @@ model_names = sorted(name for name in models.__dict__
 
 parser = argparse.ArgumentParser(description='PyTorch CIFAR10/100 Training')
 # Datasets
-parser.add_argument('-d', '--dataset', default='cifar10', type=str)
+parser.add_argument('-d', '--dataset', default='cifar100', type=str)
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
 # Optimization options
@@ -119,27 +119,6 @@ best_acc = 0  # best test accuracy
 
 def main():
     global best_acc
-    start_epoch = args.start_epoch  # start from epoch 0 or last checkpoint epoch
-    # loss_name = "LS+MDCA"
-    # loss_name = "LS"
-    # loss_name = "NLL+DCA"
-    # loss_name = "NLL+MDCA"
-    loss_name = "NLL"
-    # alpha = args.alpha
-    alpha = 0.1
-    beta = 4.0
-    # prefix = "6-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_alpha={alpha}_lr={args.lr}"
-    # prefix = "random_test"
-    # prefix = "7-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_alpha={alpha}_beta={beta}_lr={args.lr}"
-    # prefix = "9-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_beta={beta}_lr={args.lr}"
-    prefix = "9-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_lr={args.lr}"
-    # prefix = f"{args.dataset}_{args.arch}_depth={args.depth}_{loss_name}_{alpha}_lr={args.lr}"
-    title = prefix
-    # writer = SummaryWriter(log_dir= f"acmmm_tensorboard/{prefix}")
-
-    args.checkpoint = "checkpoints/" + args.dataset + "/" + title
-    if not os.path.isdir(args.checkpoint):
-        mkdir_p(args.checkpoint)
 
     # Data
     print('==> Preparing dataset %s' % args.dataset)
@@ -155,8 +134,8 @@ def main():
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
     
-    dataloader = datasets.CIFAR10
-    num_classes = 10
+    dataloader = datasets.CIFAR100
+    num_classes = 100
     classes = ["airplanes", "cars", "birds", "cats", "deer", "dogs", "frogs", "horses", "ships", "trucks"]
 
     ece_evaluator = ECELoss(n_classes = num_classes)
@@ -165,10 +144,17 @@ def main():
     trainset = dataloader(root='./data', train=True, download=True, transform=transform_train)
     trainloader = data.DataLoader(trainset, batch_size=args.train_batch, shuffle=True, num_workers=args.workers)
 
-    testset = dataloader(root='./data', train=False, download=False, transform=transform_test)
+    
+    sub_testset = dataloader(root='./data', train=False, download=False, transform=transform_test)
+    full_testset = dataloader(root='./data', train=False, download=False, transform=transform_test)
     # testset = CIFAR100_C(severity=3, transform=transform_test)
-    print(len(testset))
-    testloader = data.DataLoader(testset, batch_size=args.test_batch, shuffle=False, num_workers=args.workers)
+
+    indices = list(range(0, len(full_testset)))
+    random.shuffle(indices)
+    ss = torch.utils.data.sampler.SubsetRandomSampler(indices[:int(0.1 * len(full_testset))])
+
+    testloader = data.DataLoader(full_testset, batch_size=args.test_batch, shuffle=False, num_workers=args.workers)
+    subloader = data.DataLoader(sub_testset, batch_size=args.test_batch, shuffle=False, num_workers=args.workers, sampler=ss)
 
     # Model
     print("==> creating model arch {} with depth={}".format(args.arch, args.depth))
@@ -183,129 +169,50 @@ def main():
     cudnn.benchmark = True
     print('    Total params: %.2fM' % (sum(p.numel() for p in model.parameters())/1000000.0))
 
-    # criterion = MDCATrainLoss_alpha(alpha)
-    # criterion = CCETrainLoss_alpha(n_classes = num_classes, alpha=args.alpha)
-    criterion = DCATrainLoss_alpha(beta = 0.0)
-    # criterion = MDCA_NLLLoss(n_classes=num_classes, beta=beta)
-    # criterion = MDCA_LabelSmoothLoss(n_classes = num_classes, alpha=alpha, beta = beta)
-    # criterion = nn.CrossEntropyLoss() 
+    criterion = nn.CrossEntropyLoss() 
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
-    if args.resume:
-        # Load checkpoint.
-        print('==> Resuming from checkpoint..')
-        assert os.path.isfile(args.resume), 'Error: no checkpoint directory found!'
-        args.checkpoint = os.path.dirname(args.resume)
-        checkpoint = torch.load(args.resume)
-        best_acc = checkpoint['best_acc']
-        start_epoch = checkpoint['epoch']
-        model.load_state_dict(checkpoint['state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer'])
-        model.cuda()
-
-    if args.evaluate:
-        print('\nEvaluation only')
-        # tsne(testloader, model, criterion, start_epoch, use_cuda, writer, ece_evaluator, fastcce_evaluator, classes, prefix)
-        do_umap(testloader, model, criterion, start_epoch, use_cuda, ece_evaluator, fastcce_evaluator, classes, prefix)
-        # test_loss, test_acc = test(testloader, model, criterion, start_epoch, use_cuda, writer, ece_evaluator, fastcce_evaluator, classes, prefix)
-        # print(' Test Loss:  %.8f, Test Acc:  %.2f' % (test_loss, test_acc))
-        return
+    assert args.resume
     
-    logger = Logger(os.path.join(args.checkpoint, 'loggings.txt'), title=title)
-    logger.set_names(['lr', 'train_loss', 'val_loss', 'top1_train', 'top1', 'top3', 'top5', 'SCE', 'ECE'])
+    # Load checkpoint.
+    print('==> Resuming from checkpoint..')
+    assert os.path.isfile(args.resume), 'Error: no checkpoint directory found!'
+    args.checkpoint = os.path.dirname(args.resume)
+    prefix = args.checkpoint
+    title = prefix
+    checkpoint = torch.load(args.resume)
+    
+    model.load_state_dict(checkpoint['state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer'])
+    model.cuda()
+    
+    print('\nEvaluation only')
 
-    # Train and val
-    for epoch in range(start_epoch, args.epochs):
-        adjust_learning_rate(optimizer, epoch)
+    best_val_loss = float('inf')
+    best_t = -1
 
-        print('\nEpoch: [%d | %d] LR: %f' % (epoch + 1, args.epochs, state['lr']))
+    for t in tqdm([1.0, 1.2, 1.5, 1.7, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.7, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5]):
+        train_loss, top1, top3, top5, cce_score_t, ece_score_t = test(subloader, model, criterion, 0, use_cuda, ece_evaluator, fastcce_evaluator, classes, prefix, t)
+        
+        print(f"T={t} | SCE={cce_score_t} | ECE={ece_score_t}")
 
-        train_loss, top1_train, _, _ = train(trainloader, model, criterion, optimizer, epoch, use_cuda)
-        test_loss, top1, top3, top5, cce_score, ece_score = test(testloader, model, criterion, epoch, use_cuda, ece_evaluator, fastcce_evaluator, classes, prefix)
+        if(train_loss < best_val_loss):
+            best_t = t
+            best_val_loss = train_loss
 
-        # append logger file
-        logger.append([state['lr'], train_loss, test_loss, top1_train, top1, top3, top5, cce_score, ece_score])
 
-        # save model
-        is_best = top1 > best_acc
-        best_acc = max(top1, best_acc)
-        save_checkpoint({
-                'epoch': epoch + 1,
-                'state_dict': model.state_dict(),
-                'acc': top1,
-                'best_acc': best_acc,
-                'optimizer' : optimizer.state_dict(),
-            }, is_best, checkpoint=args.checkpoint)
-
-    logger.close()
-    logger.plot()
-    savefig(os.path.join(args.checkpoint, 'log.eps'))
-
-    print('Best acc:')
-    print(best_acc)
+    test_loss, top1, top3, top5, cce_score, ece_score = test(testloader, model, criterion, 0, use_cuda, ece_evaluator, fastcce_evaluator, classes, prefix, best_t)
+    print(f"Best T={best_t}  SCE={cce_score}   ECE={ece_score}")
 
     # run t-sne last
-    tsne(testloader, model, criterion, start_epoch, use_cuda, ece_evaluator, fastcce_evaluator, classes, prefix)
-    do_umap(testloader, model, criterion, start_epoch, use_cuda, ece_evaluator, fastcce_evaluator, classes, prefix)
-
-def train(trainloader, model, criterion, optimizer, epoch, use_cuda):
-    # switch to train mode
-    model.train()
-
-    losses = AverageMeter()
-    top1 = AverageMeter()
-    top3 = AverageMeter()
-    top5 = AverageMeter()
-    end = time.time()
-
-    criterion.reset()
-
-    bar = tqdm(enumerate(trainloader), total=len(trainloader))
-    for batch_idx, (inputs, targets) in bar:
-        
-        inputs, targets = inputs.cuda(), targets.cuda()
-
-        # compute output
-        outputs = model(inputs)
-
-        loss_dict = criterion(outputs, targets)
-
-        if type(loss_dict) == type((1, 2)):
-            loss = loss_dict[0]["loss"]
-        else:
-            loss = loss_dict
-
-        # measure accuracy and record loss
-        prec1, prec3, prec5 = accuracy(outputs.data, targets.data, topk=(1, 3, 5))
-        losses.update(loss.item(), inputs.size(0))
-
-        top1.update(prec1.item(), inputs.size(0))
-        top3.update(prec3.item(), inputs.size(0))
-        top5.update(prec5.item(), inputs.size(0))
-
-        # compute gradient and do SGD step
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        # plot progress
-        bar.set_postfix_str('({batch}/{size}) Loss: {loss:.8f} | top1: {top1: .4f} | top3: {top3: .4f} | top5: {top5: .4f}'.format(
-                    batch=batch_idx + 1,
-                    size=len(trainloader),
-                    loss=losses.avg,
-                    top1=top1.avg,
-                    top3=top3.avg,
-                    top5=top5.avg,
-                    ))
-
-    # return (criterion.get_overall_CCELoss(), top1.avg)
-    return (losses.avg, top1.avg, top3.avg, top5.avg)
+    # tsne(testloader, model, criterion, start_epoch, use_cuda, ece_evaluator, fastcce_evaluator, classes, prefix)
+    # do_umap(testloader, model, criterion, start_epoch, use_cuda, ece_evaluator, fastcce_evaluator, classes, prefix)
 
 @torch.no_grad()
-def test(testloader, model, criterion, epoch, use_cuda, ece_evaluator, fastcce_evaluator, classes, prefix):
+def test(testloader, model, criterion, epoch, use_cuda, ece_evaluator, fastcce_evaluator, classes, prefix, T=1.0):
     global best_acc
 
-    criterion.reset()
+    # criterion.reset()
     ece_evaluator.reset()
     fastcce_evaluator.reset()
 
@@ -318,13 +225,14 @@ def test(testloader, model, criterion, epoch, use_cuda, ece_evaluator, fastcce_e
     model.eval()
 
     end = time.time()
-    bar = tqdm(enumerate(testloader), total=len(testloader))
-    for batch_idx, (inputs, targets) in bar:
+    for batch_idx, (inputs, targets) in enumerate(testloader):
 
         inputs, targets = inputs.cuda(), targets.cuda()
 
         # compute output
         outputs = model(inputs)
+
+        outputs /= T
 
         loss_dict = criterion(outputs, targets)
 
@@ -346,48 +254,10 @@ def test(testloader, model, criterion, epoch, use_cuda, ece_evaluator, fastcce_e
 
         # measure elapsed time
         end = time.time()
-
-        # plot progress
-        bar.set_postfix_str('({batch}/{size}) Loss: {loss:.8f} | top1: {top1: .4f} | top3: {top3: .4f} | top5: {top5: .4f}'.format(
-                    batch=batch_idx + 1,
-                    size=len(testloader),
-                    loss=losses.avg,
-                    top1=top1.avg,
-                    top3=top3.avg,
-                    top5=top5.avg,
-                    ))
     # bar.finish()
 
-    # writer.add_scalar("[EVAL END] top1", top1.avg * 100, epoch )
-    # writer.add_scalar("[EVAL END] top5", top5.avg * 100, epoch )
-
-    # ece_count_table_image, _ = ece_evaluator.get_count_table_img(classes = classes, tempFileName=prefix)
-    # ece_table_image, ece_dif_map = ece_evaluator.get_perc_table_img(classes = classes, tempFileName=prefix)
-    
-    # cce_count_table_image, _ = fastcce_evaluator.get_count_table_img(classes = classes, tempFileName=prefix)
-    # cce_table_image, cce_dif_map = fastcce_evaluator.get_perc_table_img(classes = classes, tempFileName=prefix)
-    # ece_dif_mean, ece_dif_std = ece_evaluator.get_diff_mean_std()
-    # cce_dif_mean, cce_dif_std = fastcce_evaluator.get_diff_mean_std()
-    # writer.add_image("ece_table", ece_table_image, epoch, dataformats="HWC")
-    # writer.add_image("ece Count table", ece_count_table_image, epoch, dataformats="HWC")
-    # writer.add_image("ece DifMap", ece_dif_map, epoch, dataformats="HWC")
-
     eces = ece_evaluator.get_overall_ECELoss()
-    # writer.add_scalar("ece_mean", ece_dif_mean, epoch)
-    # writer.add_scalar("ece_std", ece_dif_std, epoch)
-    # writer.add_scalar("ece Score", eces, epoch)
-    # writer.add_scalar("ece dif Score", ece_evaluator.get_diff_score(), epoch)
-
-    # writer.add_image("cce_table", cce_table_image, epoch, dataformats="HWC")
-    # writer.add_image("cce Count table", cce_count_table_image, epoch, dataformats="HWC")
-    # writer.add_image("cce DifMap", cce_dif_map, epoch, dataformats="HWC")
-
     cces = fastcce_evaluator.get_overall_CCELoss()
-
-    # writer.add_scalar("cce_mean", cce_dif_mean, epoch)
-    # writer.add_scalar("cce_std", cce_dif_std, epoch)
-    # writer.add_scalar("cce Score", cces, epoch)
-    # writer.add_scalar("cce dif Score", fastcce_evaluator.get_diff_score(), epoch)
 
     return (losses.avg, top1.avg, top3.avg, top5.avg, cces, eces)
 

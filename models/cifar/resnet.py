@@ -157,6 +157,21 @@ class ResNet(nn.Module):
         x = self.fc(x)
 
         return x
+    
+    def give_second_last(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)    # 32x32
+
+        x = self.layer1(x)  # 32x32
+        x = self.layer2(x)  # 16x16
+        x = self.layer3(x)  # 8x8
+
+        x = self.avgpool(x)
+        x = x.view(x.size(0), -1)
+        # x = self.fc(x)
+
+        return x
 
 
 def resnet(**kwargs):

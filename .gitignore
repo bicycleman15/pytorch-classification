@@ -98,4 +98,13 @@ ENV/
 # Rope project settings
 .ropeproject
 
-weights/
+weights
+.vscode
+iccv_tensorboard
+t-sne-plots
+umap-plots
+temp_files
+acmmm
+acmmm_tensorboard
+list.txt
+temp_utils

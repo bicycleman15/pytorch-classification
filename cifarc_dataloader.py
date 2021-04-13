@@ -4,9 +4,9 @@ import torch.utils.data as data
 from PIL import Image
 
 class CIFAR100_C(data.Dataset):
-    def __init__(self, path="data/CIFAR-100-C/fog.npy", severity=1, transform = None, target_transform = None):
+    def __init__(self, path="data/cifar-100-corrupted/CIFAR-100-C/fog.npy", severity=1, transform = None, target_transform = None):
         self.data = np.load(open(path, "rb"))
-        self.label = np.load(open("data/CIFAR-100-C/labels.npy", "rb"))
+        self.label = np.load(open("data/cifar-100-corrupted/CIFAR-100-C/labels.npy", "rb"))
 
         print("[INFO] loaded data {}".format(path))
 

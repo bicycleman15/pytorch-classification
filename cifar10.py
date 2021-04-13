@@ -26,7 +26,7 @@ import pandas as pd
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 
-from solver.loss import CCETrainLoss_alpha, MDCATrainLoss_alpha, MDCA_LabelSmoothLoss, DCATrainLoss_alpha, MDCA_NLLLoss
+from solver.loss import CCETrainLoss_alpha, MDCATrainLoss_alpha, MDCA_LabelSmoothLoss, DCATrainLoss_alpha, MDCA_NLLLoss, FocalLoss, FocalMDCA_NLLLoss, FocalMDCA_LS
 from utils import Bar, Logger, AverageMeter, accuracy, mkdir_p, savefig
 from resnet import cifar_resnet56
 from cifarc_dataloader import CIFAR100_C
@@ -121,18 +121,24 @@ def main():
     global best_acc
     start_epoch = args.start_epoch  # start from epoch 0 or last checkpoint epoch
     # loss_name = "LS+MDCA"
+    # loss_name = "NLL+FMDCA"
+    loss_name = "LS+FMDCA"
     # loss_name = "LS"
     # loss_name = "NLL+DCA"
     # loss_name = "NLL+MDCA"
-    loss_name = "NLL"
+    # loss_name = "FL"
+    # loss_name = "NLL"
     # alpha = args.alpha
     alpha = 0.1
-    beta = 4.0
+    beta = 20
+    gamma = 2.0
     # prefix = "6-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_alpha={alpha}_lr={args.lr}"
     # prefix = "random_test"
-    # prefix = "7-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_alpha={alpha}_beta={beta}_lr={args.lr}"
+    # prefix = "10-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_gamma={gamma}_beta={beta}_lr={args.lr}"
+    prefix = "10-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_gamma={gamma}_beta={beta}_alpha={alpha}_lr={args.lr}"
     # prefix = "9-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_beta={beta}_lr={args.lr}"
-    prefix = "9-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_lr={args.lr}"
+    # prefix = "9-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_gamma={gamma}_lr={args.lr}"
+    # prefix = "9-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_lr={args.lr}"
     # prefix = f"{args.dataset}_{args.arch}_depth={args.depth}_{loss_name}_{alpha}_lr={args.lr}"
     title = prefix
     # writer = SummaryWriter(log_dir= f"acmmm_tensorboard/{prefix}")
@@ -185,10 +191,13 @@ def main():
 
     # criterion = MDCATrainLoss_alpha(alpha)
     # criterion = CCETrainLoss_alpha(n_classes = num_classes, alpha=args.alpha)
-    criterion = DCATrainLoss_alpha(beta = 0.0)
+    # criterion = DCATrainLoss_alpha(beta = beta)
     # criterion = MDCA_NLLLoss(n_classes=num_classes, beta=beta)
     # criterion = MDCA_LabelSmoothLoss(n_classes = num_classes, alpha=alpha, beta = beta)
+    # criterion = FocalMDCA_NLLLoss(gamma=gamma, beta=beta)
+    criterion = FocalMDCA_LS(num_classes, alpha=alpha, beta=beta, gamma=gamma)
     # criterion = nn.CrossEntropyLoss() 
+    # criterion = FocalLoss(gamma=gamma) 
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
     if args.resume:
