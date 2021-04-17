@@ -48,6 +48,7 @@ def parse_args():
     parser.add_argument('--lossname', default='NLL', type=str, metavar='LNAME')
     parser.add_argument('--model', default='resnet34', type=str, metavar='MNAME')
     parser.add_argument('--optimizer', default='sgd', type=str, metavar='ONAME')
-    # Architecture
+
+    parser.add_argument('--prefix', default='', type=str, metavar='PRNAME')
     
     return parser.parse_args()

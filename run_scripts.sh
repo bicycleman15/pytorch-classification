@@ -57,7 +57,13 @@ python tiny_imagenet.py -a resnet --depth 32 \
 
 # TRAIN
 python train.py \
---epochs 5 --schedule-steps 2 4 --lr-decay-factor 0.3 \
---lossname jatin --beta 30 --alpha 0.2 \
---model alexnet \
---dataset cifar100
+--epochs 5 \
+--lossname NLL \
+--model resnet18 \
+--dataset svhn \
+--prefix temp-train
+
+python temp_scaling.py \
+--model resnet18 \
+--dataset svhn \
+--resume checkpoints/svhn/resnet18/temp-train-NLL/checkpoint.pth

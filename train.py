@@ -45,8 +45,34 @@ if __name__ == "__main__":
     
     args = parse_args()
 
+    assert args.dataset in dataloader_dict
+    assert args.model in model_dict
+    assert args.lossname in loss_dict
+    assert args.dataset in dataset_nclasses_dict
+
     loss_save_string = create_loss_save_str(args)
+    orig_loss_string = loss_save_string
+
+    if len(args.prefix):
+        loss_save_string = args.prefix + "-" + loss_save_string
+
+    # prepare save path
+    model_save_pth = f"{args.checkpoint}/{args.dataset}/{args.model}/{loss_save_string}"
+    if not os.path.isdir(model_save_pth):
+        mkdir_p(model_save_pth)
+
+    logging.basicConfig(level=logging.DEBUG, 
+                        format="%(levelname)s:  %(message)s",
+                        handlers=[
+                            logging.FileHandler(filename=os.path.join(model_save_pth, "train.log")),
+                            logging.StreamHandler()
+                        ])
+    logging.info(f"Setting up logging folder : {model_save_pth}")
+
+    num_classes = dataset_nclasses_dict[args.dataset]
     criterion = loss_dict[args.lossname](alpha=args.alpha, beta=args.beta, gamma=args.gamma, n_classes=num_classes)
+
+    logging.info(f"Using loss function : {orig_loss_string}")
     
     # prepare model
     logging.info(f"Using model : {args.model}")
@@ -54,26 +80,9 @@ if __name__ == "__main__":
     model.cuda()
 
     # set up dataset
+    logging.info(f"Using dataset : {args.dataset}")
     trainloader, testloader = dataloader_dict[args.dataset](args)
 
-    # prepare save path
-    model_save_pth = f"{args.checkpoint}/{args.dataset}/{args.model}/{loss_save_string}"
-    if not os.path.isdir(model_save_pth):
-        mkdir_p(model_save_pth)
-    
-    logging.basicConfig(level=logging.DEBUG, 
-                        format="%(levelname)s:  %(message)s",
-                        handlers=[
-                            logging.FileHandler(filename=os.path.join(model_save_pth, "train.log")),
-                            logging.StreamHandler()
-                        ])
-
-    logging.info(f"Using dataset : {args.dataset}")
-    logging.info(f"Using loss function : {loss_save_string}")
-    
-    logging.info(f"Setting up logging folder : {model_save_pth}")
-
-    num_classes = dataset_nclasses_dict[args.dataset]
 
     # set up metrics
     ece_evaluator = ECELoss(n_classes = num_classes)    
@@ -130,7 +139,16 @@ if __name__ == "__main__":
 
         # append logger file
         logger.append([get_lr(optimizer), train_loss, test_loss, top1_train, top1, top3, top5, cce_score, ece_score])
-        logging.info([get_lr(optimizer), train_loss, test_loss, top1_train, top1, top3, top5, cce_score, ece_score])
+
+        logging.info("End of epoch {} stats: train_loss : {:.4f} | val_loss : {:.4f} | top1_train : {:.4f} | top1 : {:.4f} | ECE : {:.5f} | SCE : {:.5f}".format(
+            epoch+1,
+            train_loss,
+            test_loss,
+            top1_train,
+            top1,
+            ece_score,
+            cce_score
+        ))
 
         # save model
         is_best = top1 > best_acc
@@ -143,6 +161,8 @@ if __name__ == "__main__":
                 'best_acc': best_acc,
                 'optimizer' : optimizer.state_dict(),
                 'scheduler' : scheduler.state_dict(),
+                'dataset' : args.dataset,
+                'model' : args.model
             }, is_best, checkpoint=model_save_pth)
 
     # DO UMAP T_SNE ....

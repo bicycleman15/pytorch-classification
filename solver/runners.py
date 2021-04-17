@@ -52,7 +52,7 @@ def train(trainloader, model, criterion, optimizer):
     return (losses.avg, top1.avg, top3.avg, top5.avg)
 
 @torch.no_grad()
-def test(testloader, model, criterion, ece_criterion, sce_criterion):
+def test(testloader, model, criterion, ece_criterion, sce_criterion, T=1.0):
 
     criterion.reset()
     ece_criterion.reset()
@@ -73,11 +73,11 @@ def test(testloader, model, criterion, ece_criterion, sce_criterion):
 
         # compute output
         outputs = model(inputs)
+        outputs /= T
 
         loss_dict = criterion(outputs, targets)
 
         loss = loss_dict[0]["loss"]
-
 
         ece_criterion.forward(outputs,targets)
         sce_criterion.forward(outputs,targets)
@@ -103,3 +103,36 @@ def test(testloader, model, criterion, ece_criterion, sce_criterion):
     cces = sce_criterion.get_overall_CCELoss()
 
     return (losses.avg, top1.avg, top3.avg, top5.avg, cces.item(), eces.item())
+
+@torch.no_grad()
+def get_logits_targets(testloader, model, criterion):
+
+    criterion.reset()
+
+    losses = AverageMeter()
+    top1 = AverageMeter()
+    top3 = AverageMeter()
+    top5 = AverageMeter()
+
+    # switch to evaluate mode
+    model.eval()
+
+    all_targets = None
+    all_outputs = None
+
+    bar = tqdm(enumerate(testloader), total=len(testloader))
+    for batch_idx, (inputs, targets) in bar:
+
+        inputs, targets = inputs.cuda(), targets.cuda()
+
+        # compute output
+        outputs = model(inputs)
+
+        if all_targets is None:
+            all_outputs = outputs
+            all_targets = targets
+        else:
+            all_targets = torch.cat([all_targets, targets], dim=0)
+            all_outputs = torch.cat([all_outputs, outputs], dim=0)
+
+    return all_outputs, all_targets
