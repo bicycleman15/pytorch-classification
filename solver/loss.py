@@ -4,6 +4,7 @@ from calibration_library.cce_loss import CCELossFast
 from calibration_library.ece_loss import ECELoss
 from calibration_library.MDCA import MDCA, Focal_MDCA
 from calibration_library.DCA import DCA
+import logging
 
 class CCETrainLoss(CCELossFast):
     def __init__(self, n_classes, n_bins = 10, **kwargs):
@@ -20,7 +21,7 @@ class CCETrainLoss_alpha(CCELossFast):
         super().__init__(n_classes, n_bins=n_bins, mode = "train")
         self.nll = torch.nn.CrossEntropyLoss(ignore_index=ignore_index)
         self.alpha = alpha
-        print("Using alpha value = {}".format(self.alpha))
+        logging.info("Using alpha value = {}".format(self.alpha))
 
     def forward(self, output, target):
         # import pdb; pdb.set_trace()
@@ -31,11 +32,11 @@ class CCETrainLoss_alpha(CCELossFast):
         return dict(loss=loss), loss_cal, loss_nll    
 
 class MDCATrainLoss_alpha(MDCA):
-    def __init__(self, alpha = 1, ignore_index=-1):
+    def __init__(self, alpha = 1, ignore_index=-1, **kwargs):
         super().__init__()
         self.nll = torch.nn.CrossEntropyLoss(ignore_index=ignore_index)
         self.alpha = alpha
-        print("Using alpha value = {}".format(self.alpha))
+        logging.info("Using alpha value = {}".format(self.alpha))
 
     def forward(self, output, target):
         # import pdb; pdb.set_trace()
@@ -46,11 +47,11 @@ class MDCATrainLoss_alpha(MDCA):
         return dict(loss=loss), loss_cal, loss_nll    
 
 class DCATrainLoss_alpha(DCA):
-    def __init__(self, beta = 1, ignore_index=-1):
+    def __init__(self, beta = 1, ignore_index=-1, **kwargs):
         super().__init__()
         self.nll = torch.nn.CrossEntropyLoss(ignore_index=ignore_index)
         self.beta = beta
-        print("Using beta value = {}".format(self.beta))
+        logging.info("Using beta value = {}".format(self.beta))
 
     def forward(self, output, target):
         # import pdb; pdb.set_trace()
@@ -62,15 +63,15 @@ class DCATrainLoss_alpha(DCA):
 
 
 class MDCA_LabelSmoothLoss(nn.Module):
-    def __init__(self, n_classes,alpha = 0, beta = 0, ignore_index=-1):
+    def __init__(self, n_classes,alpha = 0, beta = 0, ignore_index=-1, **kwargs):
         super().__init__()
         self.n_classes = n_classes
         self.LSL = LabelSmoothingLoss(n_classes = self.n_classes , smoothing= alpha) 
         self.MDCA = MDCA()
         self.alpha = alpha
         self.beta = beta
-        print("Using alpha value = {}".format(self.alpha))
-        print("Using beta value = {}".format(self.beta))
+        logging.info("Using alpha value = {}".format(self.alpha))
+        logging.info("Using beta value = {}".format(self.beta))
     
     
     def reset(self):
@@ -91,13 +92,13 @@ class MDCA_LabelSmoothLoss(nn.Module):
         return dict(loss=loss), loss_cal, loss_nll 
 
 class MDCA_NLLLoss(nn.Module):
-    def __init__(self, n_classes, beta = 0, ignore_index=-1):
+    def __init__(self, n_classes, beta = 0, ignore_index=-1, **kwargs):
         super().__init__()
         self.n_classes = n_classes
         self.CE = torch.nn.CrossEntropyLoss(ignore_index=ignore_index) 
         self.MDCA = MDCA()
         self.beta = beta
-        print("Using beta value = {}".format(self.beta))
+        logging.info("Using beta value = {}".format(self.beta))
     
     
     def reset(self):
@@ -122,7 +123,7 @@ class ECETrainLoss_alpha(ECELoss):
         super().__init__(n_classes, n_bins=n_bins)
         self.nll = torch.nn.CrossEntropyLoss(ignore_index=ignore_index)
         self.alpha = alpha
-        print("Using alpha value = {}".format(self.alpha))
+        logging.info("Using alpha value = {}".format(self.alpha))
 
     def forward(self, output, target):
         # import pdb; pdb.set_trace()
@@ -133,7 +134,7 @@ class ECETrainLoss_alpha(ECELoss):
         return dict(loss=loss), loss_cal, loss_nll      
 
 class LabelSmoothingLoss(nn.Module):
-    def __init__(self, n_classes, smoothing=0.0, dim=-1):
+    def __init__(self, n_classes, smoothing=0.0, dim=-1, **kwargs):
         super(LabelSmoothingLoss, self).__init__()
         self.confidence = 1.0 - smoothing
         self.smoothing = smoothing
@@ -157,7 +158,7 @@ class FocalLoss(nn.Module):
         self.gamma = gamma
         self.size_average = size_average
 
-        print("using gamma={}".format(gamma))
+        logging.info("using gamma={}".format(gamma))
 
     def forward(self, input, target):
         if input.dim()>2:
@@ -189,8 +190,8 @@ class FocalMDCA_NLLLoss(nn.Module):
         self.CE = torch.nn.CrossEntropyLoss(ignore_index=ignore_index) 
         self.MDCA = Focal_MDCA(gamma=self.gamma)
         
-        print("Using beta value = {}".format(self.beta))
-        print("Using gamma value = {}".format(self.gamma))
+        logging.info("Using beta value = {}".format(self.beta))
+        logging.info("Using gamma value = {}".format(self.gamma))
     
     def reset(self):
         pass
@@ -220,9 +221,9 @@ class FocalMDCA_LS(nn.Module):
         self.CE = LabelSmoothingLoss(n_classes = self.n_classes , smoothing= self.alpha) 
         self.MDCA = Focal_MDCA(gamma=self.gamma)
         
-        print("Using beta value = {}".format(self.beta))
-        print("Using gamma value = {}".format(self.gamma))
-        print("Using alpha value = {}".format(self.alpha))
+        logging.info("Using beta value = {}".format(self.beta))
+        logging.info("Using gamma value = {}".format(self.gamma))
+        logging.info("Using alpha value = {}".format(self.alpha))
     
     def reset(self):
         pass
@@ -238,4 +239,46 @@ class FocalMDCA_LS(nn.Module):
         loss_nll = self.CE(output, target)
         
         loss = loss_nll + self.beta * loss_cal
+        return dict(loss=loss), loss_cal, loss_nll 
+
+class CrossEntropyWrapper(nn.Module):
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.nll = torch.nn.CrossEntropyLoss()
+
+    def forward(self, output, target):
+        # import pdb; pdb.set_trace()
+        loss_cal = 0
+        loss_nll = self.nll(output, target)
+        
+        loss = loss_nll
+        return dict(loss=loss), loss_cal, loss_nll     
+
+    def reset(self):
+        pass
+
+
+class LS_Wrapper(nn.Module):
+    def __init__(self, n_classes, alpha = 0, ignore_index=-1, **kwargs):
+        super().__init__()
+        self.n_classes = n_classes
+        self.alpha = alpha
+        self.LSL = LabelSmoothingLoss(n_classes=self.n_classes, smoothing=self.alpha) 
+        logging.info("Using alpha value = {}".format(self.alpha))
+        
+    def reset(self):
+        pass
+
+    def forward(self, output, target):
+
+        '''
+        output = [batch, n_Class] np array: The complete logit vector of an image 
+
+        target = [batch] np array: The GT for the image
+        # outputs must be logits
+        '''
+        loss_cal = 0
+        loss_nll = self.LSL(output, target)
+        
+        loss = loss_nll
         return dict(loss=loss), loss_cal, loss_nll 

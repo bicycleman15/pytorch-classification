@@ -30,6 +30,34 @@ python temp_scaling_cifar100.py -a resnet --depth 32 \
 
 # TRAIN
 python svhn.py -a resnet --depth 20 \
---epochs 35 --schedule 18 28 --gamma 0.1 --wd 1e-4
+--epochs 20 --schedule 10 25 --gamma 0.1 --wd 1e-4
 
 # TEMP SCALING
+python temp_scaling_svhn.py -a resnet --depth 20 \
+--resume checkpoints/svhn/14-April-svhn_resnet_depth=20_lossname=NLL_lr=0.1/checkpoint.pth.tar
+
+
+
+# TINY-IMAGENET
+
+# TRAIN
+python tiny_imagenet.py -a resnet --depth 32 \
+--epochs 250 --schedule 100 150 200 --gamma 0.1 --wd 1e-4
+
+# TEMP SCALING
+
+
+
+# CIFAR10
+
+# TRAIN:
+
+# RESNET-32
+# Define rest of the parameters in the cifar.py file
+
+# TRAIN
+python train.py \
+--epochs 5 --schedule-steps 2 4 --lr-decay-factor 0.3 \
+--lossname jatin --beta 30 --alpha 0.2 \
+--model alexnet \
+--dataset cifar100

@@ -26,6 +26,7 @@ class Logger(object):
         self.file = None
         self.resume = resume
         self.title = '' if title == None else title
+        self.path_name = fpath
         if fpath is not None:
             if resume: 
                 self.file = open(fpath, 'r') 
@@ -75,6 +76,7 @@ class Logger(object):
             plt.plot(x, np.asarray(numbers[name]))
         plt.legend([self.title + '(' + name + ')' for name in names])
         plt.grid(True)
+        plt.savefig(str(self.path_name) + "_plot.png")
 
     def close(self):
         if self.file is not None:

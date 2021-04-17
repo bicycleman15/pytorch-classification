@@ -1,0 +1,6 @@
+freeze the net
+tb intergation
+train on ece^^2experiment with lr
+train on ece loss(both)
+temp scaline ece sscore
+temp scaling on classi

@@ -26,7 +26,7 @@ import pandas as pd
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 
-from solver.loss import CCETrainLoss_alpha, MDCATrainLoss_alpha, MDCA_LabelSmoothLoss, DCATrainLoss_alpha, MDCA_NLLLoss
+from solver.loss import CCETrainLoss_alpha, MDCATrainLoss_alpha, MDCA_LabelSmoothLoss, DCATrainLoss_alpha, MDCA_NLLLoss, FocalLoss, FocalMDCA_NLLLoss, FocalMDCA_LS
 from utils import Bar, Logger, AverageMeter, accuracy, mkdir_p, savefig
 from resnet import cifar_resnet56
 from cifarc_dataloader import CIFAR100_C
@@ -38,6 +38,8 @@ from calibration_library.cce_loss import CCELossFast
 from torch.utils.tensorboard import SummaryWriter
 import umap
 
+from data_loaders.svhn import get_train_valid_loader
+
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -45,7 +47,7 @@ model_names = sorted(name for name in models.__dict__
 
 parser = argparse.ArgumentParser(description='PyTorch CIFAR10/100 Training')
 # Datasets
-parser.add_argument('-d', '--dataset', default='cifar10', type=str)
+parser.add_argument('-d', '--dataset', default='svhn', type=str)
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
 # Optimization options
@@ -100,9 +102,6 @@ parser.add_argument('--gpu-id', default='0', type=str,
 args = parser.parse_args()
 state = {k: v for k, v in args._get_kwargs()}
 
-# Validate dataset
-assert args.dataset == 'cifar10' or args.dataset == 'cifar100', 'Dataset can only be cifar10 or cifar100.'
-
 # Use CUDA
 os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_id
 use_cuda = torch.cuda.is_available()
@@ -121,19 +120,28 @@ def main():
     global best_acc
     start_epoch = args.start_epoch  # start from epoch 0 or last checkpoint epoch
     # loss_name = "LS+MDCA"
+    # loss_name = "NLL+CCE"
+    # loss_name = "NLL+FMDCA"
+    # loss_name = "LS+MDCA"
     # loss_name = "LS"
     # loss_name = "NLL+DCA"
     # loss_name = "NLL+MDCA"
+    # loss_name = "FL"
     loss_name = "NLL"
     # alpha = args.alpha
-    alpha = 0.1
-    beta = 4.0
-    # prefix = "6-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_alpha={alpha}_lr={args.lr}"
+    alpha = 0
+    beta = 0
+    # gamma = 1.0
+    # prefix = "10-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_lr={args.lr}"
     # prefix = "random_test"
-    # prefix = "7-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_alpha={alpha}_beta={beta}_lr={args.lr}"
-    # prefix = "9-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_beta={beta}_lr={args.lr}"
-    prefix = "9-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_lr={args.lr}"
-    # prefix = f"{args.dataset}_{args.arch}_depth={args.depth}_{loss_name}_{alpha}_lr={args.lr}"
+    # prefix = "11-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_alpha={args.alpha}_lr={args.lr}"
+    # prefix = "11-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_beta={beta}_lr={args.lr}"
+    # prefix = "10-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_gamma={gamma}_beta={beta}_lr={args.lr}"
+    # prefix = "10-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_beta={beta}_alpha={alpha}_lr={args.lr}"
+    # prefix = "14-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_alpha={alpha}_beta={beta}_lr={args.lr}"
+    # prefix = "14-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_gamma={gamma}_lr={args.lr}"
+    # prefix = "14-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_lr={args.lr}"
+    prefix = "14-April-" + f"{args.dataset}_{args.arch}_depth={args.depth}_lossname={loss_name}_beta={beta}_lr={args.lr}"
     title = prefix
     # writer = SummaryWriter(log_dir= f"acmmm_tensorboard/{prefix}")
 
@@ -155,20 +163,17 @@ def main():
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
     
-    dataloader = datasets.CIFAR10
+    # dataloader = datasets.CIFAR100
     num_classes = 10
-    classes = ["airplanes", "cars", "birds", "cats", "deer", "dogs", "frogs", "horses", "ships", "trucks"]
+    classes = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 
     ece_evaluator = ECELoss(n_classes = num_classes)
     fastcce_evaluator = CCELossFast(n_classes = num_classes)
 
-    trainset = dataloader(root='./data', train=True, download=True, transform=transform_train)
-    trainloader = data.DataLoader(trainset, batch_size=args.train_batch, shuffle=True, num_workers=args.workers)
+    trainloader, testloader = get_train_valid_loader(batch_size=args.train_batch)
 
-    testset = dataloader(root='./data', train=False, download=False, transform=transform_test)
-    # testset = CIFAR100_C(severity=3, transform=transform_test)
-    print(len(testset))
-    testloader = data.DataLoader(testset, batch_size=args.test_batch, shuffle=False, num_workers=args.workers)
+    print("training data size : {}".format(len(trainloader)))
+    print("testing data size : {}".format(len(testloader)))
 
     # Model
     print("==> creating model arch {} with depth={}".format(args.arch, args.depth))
@@ -185,10 +190,13 @@ def main():
 
     # criterion = MDCATrainLoss_alpha(alpha)
     # criterion = CCETrainLoss_alpha(n_classes = num_classes, alpha=args.alpha)
-    criterion = DCATrainLoss_alpha(beta = 0.0)
-    # criterion = MDCA_NLLLoss(n_classes=num_classes, beta=beta)
-    # criterion = MDCA_LabelSmoothLoss(n_classes = num_classes, alpha=alpha, beta = beta)
+    # criterion = DCATrainLoss_alpha(beta=beta)
+    criterion = MDCA_NLLLoss(n_classes=num_classes, beta=beta)
+    # criterion = MDCA_LabelSmoothLoss(n_classes = num_classes, alpha=alpha, beta=beta)
+    # criterion = FocalMDCA_NLLLoss(gamma=gamma, beta=beta)
+    # criterion = FocalMDCA_LS(num_classes, alpha=alpha, beta=beta, gamma=gamma)
     # criterion = nn.CrossEntropyLoss() 
+    # criterion = FocalLoss(gamma=gamma) 
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
     if args.resume:
@@ -203,50 +211,23 @@ def main():
         optimizer.load_state_dict(checkpoint['optimizer'])
         model.cuda()
 
-    if args.evaluate:
-        print('\nEvaluation only')
-        # tsne(testloader, model, criterion, start_epoch, use_cuda, writer, ece_evaluator, fastcce_evaluator, classes, prefix)
-        do_umap(testloader, model, criterion, start_epoch, use_cuda, ece_evaluator, fastcce_evaluator, classes, prefix)
-        # test_loss, test_acc = test(testloader, model, criterion, start_epoch, use_cuda, writer, ece_evaluator, fastcce_evaluator, classes, prefix)
-        # print(' Test Loss:  %.8f, Test Acc:  %.2f' % (test_loss, test_acc))
-        return
-    
-    logger = Logger(os.path.join(args.checkpoint, 'loggings.txt'), title=title)
-    logger.set_names(['lr', 'train_loss', 'val_loss', 'top1_train', 'top1', 'top3', 'top5', 'SCE', 'ECE'])
+    print('\nEvaluation only')
 
-    # Train and val
-    for epoch in range(start_epoch, args.epochs):
-        adjust_learning_rate(optimizer, epoch)
+    best_val_loss = float('inf')
+    best_t = -1
 
-        print('\nEpoch: [%d | %d] LR: %f' % (epoch + 1, args.epochs, state['lr']))
+    for t in tqdm([1.0, 1.2, 1.5, 1.7, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.7, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5]):
+        train_loss, top1, top3, top5, cce_score_t, ece_score_t = test(testloader, model, criterion, 0, use_cuda, ece_evaluator, fastcce_evaluator, classes, prefix, t)
+        
+        print(f"T={t} | SCE={cce_score_t} | ECE={ece_score_t}")
 
-        train_loss, top1_train, _, _ = train(trainloader, model, criterion, optimizer, epoch, use_cuda)
-        test_loss, top1, top3, top5, cce_score, ece_score = test(testloader, model, criterion, epoch, use_cuda, ece_evaluator, fastcce_evaluator, classes, prefix)
+        if(train_loss < best_val_loss):
+            best_t = t
+            best_val_loss = train_loss
 
-        # append logger file
-        logger.append([state['lr'], train_loss, test_loss, top1_train, top1, top3, top5, cce_score, ece_score])
 
-        # save model
-        is_best = top1 > best_acc
-        best_acc = max(top1, best_acc)
-        save_checkpoint({
-                'epoch': epoch + 1,
-                'state_dict': model.state_dict(),
-                'acc': top1,
-                'best_acc': best_acc,
-                'optimizer' : optimizer.state_dict(),
-            }, is_best, checkpoint=args.checkpoint)
-
-    logger.close()
-    logger.plot()
-    savefig(os.path.join(args.checkpoint, 'log.eps'))
-
-    print('Best acc:')
-    print(best_acc)
-
-    # run t-sne last
-    tsne(testloader, model, criterion, start_epoch, use_cuda, ece_evaluator, fastcce_evaluator, classes, prefix)
-    do_umap(testloader, model, criterion, start_epoch, use_cuda, ece_evaluator, fastcce_evaluator, classes, prefix)
+    test_loss, top1, top3, top5, cce_score, ece_score = test(testloader, model, criterion, 0, use_cuda, ece_evaluator, fastcce_evaluator, classes, prefix, best_t)
+    print(f"Best T={best_t}  SCE={cce_score}   ECE={ece_score}")
 
 def train(trainloader, model, criterion, optimizer, epoch, use_cuda):
     # switch to train mode
@@ -302,7 +283,7 @@ def train(trainloader, model, criterion, optimizer, epoch, use_cuda):
     return (losses.avg, top1.avg, top3.avg, top5.avg)
 
 @torch.no_grad()
-def test(testloader, model, criterion, epoch, use_cuda, ece_evaluator, fastcce_evaluator, classes, prefix):
+def test(testloader, model, criterion, epoch, use_cuda, ece_evaluator, fastcce_evaluator, classes, prefix, T=1.0):
     global best_acc
 
     criterion.reset()
@@ -325,6 +306,8 @@ def test(testloader, model, criterion, epoch, use_cuda, ece_evaluator, fastcce_e
 
         # compute output
         outputs = model(inputs)
+
+        outputs /= T
 
         loss_dict = criterion(outputs, targets)
 

@@ -166,6 +166,8 @@ def get_data_loader(root,
                                split='val',
                                transform=val_test_transform,
                                in_memory=True)
+    
+    print(dataset)
 
     data_loader = torch.utils.data.DataLoader(
         dataset, batch_size=batch_size,
