@@ -50,5 +50,6 @@ def parse_args():
     parser.add_argument('--optimizer', default='sgd', type=str, metavar='ONAME')
 
     parser.add_argument('--prefix', default='', type=str, metavar='PRNAME')
+    parser.add_argument('--regularizer', default='l2', type=str, metavar='RNAME')
     
     return parser.parse_args()

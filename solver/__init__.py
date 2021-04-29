@@ -1,4 +1,5 @@
-from .loss import MDCA_LabelSmoothLoss, DCATrainLoss_alpha, MDCA_NLLLoss, FocalLoss, CrossEntropyWrapper, LS_Wrapper
+from .loss import MDCA_LabelSmoothLoss, DCATrainLoss_alpha, MDCA_NLLLoss, FocalLoss, CrossEntropyWrapper, LS_Wrapper, LabelSmoothedFocalLoss
+from .earlystopper import EarlyStopping
 
 loss_dict = {
     "LS+MDCA" : MDCA_LabelSmoothLoss,
@@ -6,5 +7,6 @@ loss_dict = {
     "NLL+MDCA" : MDCA_NLLLoss,
     "NLL" : CrossEntropyWrapper,
     "NLL+DCA" : DCATrainLoss_alpha,
-    "LS" : LS_Wrapper
+    "LS" : LS_Wrapper,
+    "LSFL": LabelSmoothedFocalLoss
 }

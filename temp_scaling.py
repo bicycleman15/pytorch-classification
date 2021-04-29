@@ -1,17 +1,11 @@
-import argparse
 import os
-import shutil
 import random
 
 import torch
-import torch.nn as nn
-import torch.optim as optim
 
-from utils import Logger, AverageMeter, accuracy, mkdir_p, parse_args
-from utils import get_lr, save_checkpoint
-from tqdm import tqdm
+from utils import parse_args
 
-from solver.runners import test, get_logits_targets
+from solver.runners import test, get_logits_targets_torch
 from solver import loss_dict
 
 from calibration_library.ece_loss import ECELoss
@@ -29,9 +23,9 @@ if __name__ == "__main__":
     
     args = parse_args()
 
-    assert args.dataset in temploader_dict
-    assert args.model in model_dict
-    assert args.dataset in dataset_nclasses_dict
+    # assert args.dataset in temploader_dict
+    # assert args.model in model_dict
+    # assert args.dataset in dataset_nclasses_dict
 
     logging.basicConfig(level=logging.DEBUG, 
                         format="%(levelname)s:  %(message)s",
@@ -68,8 +62,8 @@ if __name__ == "__main__":
 
     saved_model_dict = torch.load(args.resume)
 
-    assert args.model == saved_model_dict['model']
-    assert args.dataset == saved_model_dict['dataset']
+    # assert args.model == saved_model_dict['model']
+    # assert args.dataset == saved_model_dict['dataset']
 
     model.load_state_dict(saved_model_dict['state_dict'])
     model.cuda()
@@ -80,7 +74,7 @@ if __name__ == "__main__":
     best_temp = 0.
 
     logging.info("getting logits...")
-    logits, targets = get_logits_targets(temp_loader, model, criterion)
+    logits, targets = get_logits_targets_torch(temp_loader, model)
 
     logging.info("Now running temp scaling...")
 

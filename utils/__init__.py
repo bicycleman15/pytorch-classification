@@ -18,7 +18,3 @@ def save_checkpoint(state, is_best, checkpoint='checkpoint', filename='checkpoin
     torch.save(state, filepath)
     if is_best:
         shutil.copyfile(filepath, os.path.join(checkpoint, f"model_best.pth"))
-
-# progress bar
-sys.path.append(os.path.join(os.path.dirname(__file__), "progress"))
-from progress.bar import Bar as Bar

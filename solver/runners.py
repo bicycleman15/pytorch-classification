@@ -2,6 +2,8 @@ import torch
 from tqdm import tqdm
 from utils import Logger, AverageMeter, accuracy
 
+import numpy as np
+
 
 def train(trainloader, model, criterion, optimizer):
     # switch to train mode
@@ -105,14 +107,7 @@ def test(testloader, model, criterion, ece_criterion, sce_criterion, T=1.0):
     return (losses.avg, top1.avg, top3.avg, top5.avg, cces.item(), eces.item())
 
 @torch.no_grad()
-def get_logits_targets(testloader, model, criterion):
-
-    criterion.reset()
-
-    losses = AverageMeter()
-    top1 = AverageMeter()
-    top3 = AverageMeter()
-    top5 = AverageMeter()
+def get_logits_targets(testloader, model):
 
     # switch to evaluate mode
     model.eval()
@@ -120,11 +115,37 @@ def get_logits_targets(testloader, model, criterion):
     all_targets = None
     all_outputs = None
 
-    bar = tqdm(enumerate(testloader), total=len(testloader))
-    for batch_idx, (inputs, targets) in bar:
+    bar = tqdm(testloader, total=len(testloader))
+    for inputs, targets in bar:
+        inputs = inputs.cuda()
+        # compute output
+        outputs = model(inputs)
+        # to numpy
+        targets = targets.cpu().numpy()
+        outputs = outputs.cpu().numpy()
 
-        inputs, targets = inputs.cuda(), targets.cuda()
+        if all_targets is None:
+            all_outputs = outputs
+            all_targets = targets
+        else:
+            all_targets = np.concatenate([all_targets, targets], axis=0)
+            all_outputs = np.concatenate([all_outputs, outputs], axis=0)
 
+    return all_outputs, all_targets
+
+@torch.no_grad()
+def get_logits_targets_torch(testloader, model):
+
+    # switch to evaluate mode
+    model.eval()
+
+    all_targets = None
+    all_outputs = None
+
+    bar = tqdm(testloader, total=len(testloader))
+    for inputs, targets in bar:
+        inputs = inputs.cuda()
+        targets= targets.cuda()
         # compute output
         outputs = model(inputs)
 
@@ -136,3 +157,34 @@ def get_logits_targets(testloader, model, criterion):
             all_outputs = torch.cat([all_outputs, outputs], dim=0)
 
     return all_outputs, all_targets
+
+
+def fine_tune(trainloader, model, criterion, optimizer):
+    # switch to train mode
+    model.train()
+
+    losses = AverageMeter()
+    top1 = AverageMeter()
+    top3 = AverageMeter()
+    top5 = AverageMeter()
+
+    criterion.reset()
+    
+    for batch_idx, (inputs, targets) in enumerate(trainloader):
+        
+        inputs, targets = inputs.cuda(), targets.cuda()
+        # compute output
+        outputs = model(inputs)
+        
+        loss_dict = criterion(outputs, targets)
+        loss = loss_dict[0]["loss"]
+
+        # measure accuracy and record loss
+        losses.update(loss.item(), inputs.size(0))
+
+        # compute gradient and do SGD step
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+    return losses.avg

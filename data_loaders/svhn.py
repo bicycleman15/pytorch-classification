@@ -45,6 +45,21 @@ def get_train_valid_loader(args):
 
     return (train_loader, valid_loader)
 
+
+def get_datasets(args):
+    
+    # load the dataset
+    data_dir = './data'
+    train_dataset = datasets.SVHN(
+        root=data_dir, split='train',
+        download=True, transform=None,
+    )
+    valid_dataset = datasets.SVHN(
+        root=data_dir, split='test',
+        download=True, transform=None,
+    )
+    return (train_dataset, valid_dataset)
+
 def get_val_temp_loader(args):
 
     normalize = transforms.Normalize(
@@ -60,7 +75,7 @@ def get_val_temp_loader(args):
 
     data_dir = './data'
     tempset = datasets.SVHN(
-        root=data_dir, split='test',
+        root=data_dir, split='train',
         download=True, transform=valid_transform,
     )
 

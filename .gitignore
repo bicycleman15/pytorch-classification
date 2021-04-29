@@ -108,3 +108,5 @@ acmmm
 acmmm_tensorboard
 list.txt
 temp_utils
+old_checkpoints
+outputs

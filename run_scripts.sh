@@ -57,13 +57,87 @@ python tiny_imagenet.py -a resnet --depth 32 \
 
 # TRAIN
 python train.py \
---epochs 5 \
+--epochs 200 \
+--schedule-steps 100 150 \
 --lossname NLL \
---model resnet18 \
+--model resnet32 \
+--dataset cifar100 \
+--prefix 28-April
+
+python train.py \
+--epochs 100 \
+--schedule-steps 50 70 \
+--lossname LS+MDCA \
+--model resnet20 \
+--beta 50 --alpha 0.05 \
 --dataset svhn \
---prefix temp-train
+--prefix 27-April
+
+python train.py \
+--epochs 200 \
+--schedule-steps 100 150 \
+--lossname NLL+MDCA \
+--model resnet32 \
+--beta 50 \
+--dataset cifar100 \
+--prefix 27-April
+
+python train.py \
+--epochs 200 \
+--schedule-steps 50 70 \
+--lossname NLL+DCA \
+--model resnet32 \
+--beta 20 \
+--dataset cifar100 \
+--prefix 27-April
 
 python temp_scaling.py \
---model resnet18 \
+--model resnet20 \
 --dataset svhn \
---resume checkpoints/svhn/resnet18/temp-train-NLL/checkpoint.pth
+--resume old_checkpoints/svhn/14-April-svhn_resnet_depth=20_lossname=NLL+DCA_beta=1_lr=0.1/checkpoint.pth.tar
+
+python temp_scaling.py \
+--model resnet32 \
+--dataset cifar100 \
+--resume old_checkpoints/svhn/14-April-svhn_resnet_depth=20_lossname=NLL+DCA_beta=1_lr=0.1/checkpoint.pth.tar
+
+
+python eval.py \
+--model resnet34 \
+--dataset cifar10 \
+--resume checkpoints/cifar10/resnet34/19-April-LSFL_alpha=0.1_gamma=1.0/checkpoint.pth
+
+
+python dirichilit.py \
+--model resnet32 \
+--dataset cifar100 \
+--epochs 500 \
+--lr 0.001 \
+--optimizer adam \
+--regularizer l2 \
+--resume old_checkpoints/cifar100/10-April-cifar100_resnet_depth=32_lossname=NLL_lr=0.1/checkpoint.pth.tar
+
+# To generate logits for post-hoc calibration
+python gen_logits.py \
+--model resnet32 \
+--dataset cifar100 \
+--resume old_checkpoints/cifar100/10-April-cifar100_resnet_depth=32_lossname=NLL_lr=0.1/checkpoint.pth.tar
+
+# TO RUN FOR DIRI
+python dirichilit.py \
+--model resnet32 \
+--dataset cifar100 \
+--epochs 500 \
+--lr 0.001 \
+--optimizer adam \
+--regularizer l2 \
+--resume new NLL model trained
+
+python dirichilit.py \
+--model resnet32 \
+--dataset cifar100 \
+--epochs 500 \
+--lr 0.001 \
+--optimizer adam \
+--regularizer odir \
+--resume new NLL model trained

@@ -32,6 +32,13 @@ def get_train_valid_loader(args):
 
     return trainloader, testloader
 
+def get_datasets(args):
+    dataloader = datasets.CIFAR10
+    trainset = dataloader(root='./data', train=True, download=True, transform=None)
+    testset = dataloader(root='./data', train=False, download=False, transform=None)
+
+    return trainset, testset
+
 def get_val_temp_loader(args):
     transform_test = transforms.Compose([
         transforms.ToTensor(),

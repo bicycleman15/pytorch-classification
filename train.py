@@ -33,7 +33,7 @@ def create_loss_save_str(args):
     if "DCA" in loss_name:
         save_str += f"_beta={args.beta}"
     
-    if "FS" in loss_name:
+    if "FL" in loss_name:
         save_str += f"_gamma={args.gamma}"
     
     return save_str
@@ -130,7 +130,7 @@ if __name__ == "__main__":
 
     for epoch in range(start_epoch, args.epochs):
 
-        logging.info('\nEpoch: [%d | %d] LR: %f' % (epoch + 1, args.epochs, get_lr(optimizer)))
+        logging.info('Epoch: [%d | %d] LR: %f' % (epoch + 1, args.epochs, get_lr(optimizer)))
 
         train_loss, top1_train, _, _ = train(trainloader, model, criterion, optimizer)
         test_loss, top1, top3, top5, cce_score, ece_score = test(testloader, model, criterion, ece_evaluator, fastcce_evaluator)

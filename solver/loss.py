@@ -282,3 +282,36 @@ class LS_Wrapper(nn.Module):
         
         loss = loss_nll
         return dict(loss=loss), loss_cal, loss_nll 
+
+class LabelSmoothedFocalLoss(nn.Module):
+    def __init__(self, n_classes, gamma=1.0, alpha=0.1, size_average=True, **kwargs):
+        super(LabelSmoothedFocalLoss, self).__init__()
+        self.gamma = gamma
+        self.size_average = size_average
+        self.confidence = 1.0 - alpha
+        self.smoothing = alpha
+        self.cls = n_classes
+
+        logging.info("using gamma={}".format(gamma))
+        logging.info("using alpha={}".format(alpha))
+
+    def forward(self, input, target):
+        # input [b, n_class] 
+        # target = [batch, 1]
+
+        logpt = input.log_softmax(dim = 1) # [ b, classes]
+        pt = input.softmax(dim =1) # [ b, classes]
+        
+        # LS component
+        with torch.no_grad():
+            # true_dist = pred.data.clone()
+            true_dist = torch.zeros_like(logpt)
+            true_dist.fill_(self.smoothing / (self.cls - 1))
+            true_dist.scatter_(1, target.data.unsqueeze(1), self.confidence)
+
+
+        loss = -1 * torch.sum(true_dist * (1-pt)**self.gamma * logpt, dim =1).mean()
+        return dict(loss=loss), 0, 0
+    
+    def reset(self):
+        pass
